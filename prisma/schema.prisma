@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Usuario {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  contrasena String? 
+  nombre  String 
+  telefono String?
+  consultas Consulta[]
+  resenas Resena[]
+  citas Cita[]
+}
+
+// Modelo existente con adiciones
+model Consulta {
+  id            Int         @id @default(autoincrement())
+  edad          Int?
+  resultadoIA   String      // Diagnóstico generado por la API (Gemini, etc.)
+  recomendaciones String[]
+  porcentaje    String?
+  gravedad      String?
+  fecha         DateTime    @default(now())
+  estado        EstadoConsulta @default(PENDIENTE)
+
+  usuarioId     Int
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+
+  respuestas    Respuesta[]
+  diagnosticoMedico DiagnosticoMedico?
+}
+
+// Modelo existente - se mantiene sin cambios
+model Respuesta {
+  id              Int       @id @default(autoincrement())
+  pregunta        String   
+  tipoRespuesta   String   
+  respuesta       String    
+  detalles        String?  
+  seccion         String?   
+
+  consultaId      Int
+  consulta        Consulta  @relation(fields: [consultaId], references: [id])
+}
+
+
+// Nuevo modelo para médicos
+model Medico {
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  contrasena  String
+  nombre      String
+  telefono    String?
+  especialidad String
+  diagnosticos DiagnosticoMedico[]
+  citas Cita[]
+  horarios HorarioAtencion[]
+}
+
+// Nuevo modelo para el diagnóstico del médico
+model DiagnosticoMedico {
+  id                Int       @id @default(autoincrement())
+  diagnostico       String    // Diagnóstico escrito por el médico
+  recomendaciones   String    // Recomendaciones del médico
+  fechaDiagnostico  DateTime  @default(now())
+  comentarios       String?   // Comentarios adicionales
+  gravedad          Gravedad  @default(MEDIA)
+  
+  medicoId          Int
+  medico            Medico    @relation(fields: [medicoId], references: [id])
+  
+  consultaId        Int       @unique  // Relación uno a uno con Consulta
+  consulta          Consulta  @relation(fields: [consultaId], references: [id])
+}
+
+model Resena {
+  id          Int       @id @default(autoincrement())
+  comentario  String?   // Comentario que deja el usuario
+  calificacion Int      // Número de estrellas (1 a 5)
+  fecha       DateTime  @default(now())
+
+  usuarioId   Int
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+}
+
+model HorarioAtencion {
+  id          Int      @id @default(autoincrement())
+  diaSemana   String   // Día de la semana (ej: 'LUNES', 'MARTES', etc.)
+  horaInicio  DateTime // Hora de inicio del horario de atención
+  horaFin     DateTime // Hora de fin del horario de atención
+  duracionCita Int     @default(30) // Duración de cada cita en minutos
+  activo      Boolean  @default(true) // Si el horario está activo
+
+  medicoId    Int
+  medico      Medico   @relation(fields: [medicoId], references: [id])
+  
+  slots       Slot[]   // Slots de citas generados automáticamente
+  
+  @@map("horarios_atencion")
+}
+
+model Slot {
+  id          Int      @id @default(autoincrement())
+  horaInicio  DateTime // Hora de inicio del slot
+  horaFin     DateTime // Hora de fin del slot
+  disponible  Boolean  @default(true) // Si el slot está disponible para reservar
+  
+  horarioId  Int
+  horario     HorarioAtencion @relation(fields: [horarioId], references: [id], onDelete: Cascade)
+  
+  citas       Cita[]
+  
+  @@map("slots_citas")
+}
+
+model Cita {
+  id         Int      @id @default(autoincrement())
+  fechaHora  DateTime 
+  estado     EstadoCita @default(PENDIENTE)
+
+  
+  usuarioId  Int
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  
+  medicoId   Int
+  medico     Medico   @relation(fields: [medicoId], references: [id])
+  
+  slotId     Int?
+  slot       Slot?    @relation(fields: [slotId], references: [id])
+  
+  @@map("citas")
+}
+
+enum EstadoCita {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  CANCELADA
+}
+
+
+
+// Enums para estados de consulta y gravedad
+enum EstadoConsulta {
+  PENDIENTE
+  EN_REVISION
+  DIAGNOSTICADA
+  ARCHIVADA
+}
+
+enum Gravedad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
