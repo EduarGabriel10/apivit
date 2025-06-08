@@ -6,7 +6,7 @@ async function bootstrap() {
 
 
   app.enableCors({
-    origin: ['http://localhost:8100','*'],
+    origin: ['http://localhost:8100','https://vitality-blush.vercel.app'],
   });
 
   app.setGlobalPrefix('api');
